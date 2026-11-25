@@ -1,5 +1,7 @@
 # The Procurement Desk
 
+**Deployment link:** _https://procurement-desk-agent.onrender.com/_
+
 **An auditable procurement-negotiation agent for Acme.** For every supplier thread it decides
 `ACCEPT`, `COUNTER <price>`, `REJECT` or `ESCALATE`, gives the reason, and records *why* in a step-by-step
 audit trail. Submission for **Data Sprint 2.0 (Anveshan NIE)**.
@@ -17,8 +19,6 @@ audit trail. Submission for **Data Sprint 2.0 (Anveshan NIE)**.
 > 1.00. See [Run locally](#run-locally).
 
 ## How to Run [Steps to reproduce final CSV]
-
-**Deployment link:** _(link to be added)_
 
 **Requirements:** [uv](https://docs.astral.sh/uv/getting-started/installation/) and Python 3.11+. Node.js 18+
 is needed only to rebuild the web UI. Clone the repository, then run these commands from its root:
@@ -67,6 +67,7 @@ The repository includes the demo `dataset/` folder with `threads.csv`, sample fi
 8. [Real-world application](#8-real-world-application)
 9. [Drawbacks and limitations](#9-drawbacks-and-limitations)
 10. [Original work and disclosures](#10-original-work-and-disclosures)
+    
 [Additional commands](#additional-commands)
 
 
