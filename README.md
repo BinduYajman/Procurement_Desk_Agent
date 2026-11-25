@@ -16,9 +16,9 @@ audit trail. Submission for **Data Sprint 2.0 (Anveshan NIE)**.
 > `python -m unittest tests.test_golden` asserts that all 2,000 labels are identical to the file that scored
 > 1.00. See [Run locally](#run-locally).
 
-## Run locally
+## How to Run [Steps to reproduce final CSV]
 
-**Deployment link:** _Add the deployed prototype URL here._
+**Deployment link:** _(link to be added)_
 
 **Requirements:** [uv](https://docs.astral.sh/uv/getting-started/installation/) and Python 3.11+. Node.js 18+
 is needed only to rebuild the web UI. Clone the repository, then run these commands from its root:
@@ -66,6 +66,7 @@ The repository includes the demo `dataset/` folder with `threads.csv`, sample fi
 7. [Evaluation](#7-evaluation)
 8. [Real-world application](#8-real-world-application)
 9. [Drawbacks and limitations](#9-drawbacks-and-limitations)
+10. [Original work and disclosures](#10-original-work-and-disclosures)
 [Additional commands](#additional-commands)
 
 
@@ -465,6 +466,18 @@ is traceable to a playbook clause.
 
 ---
 
+## 10. Original work and disclosures
+
+**Original work.** The team designed the system’s architecture, procurement methodology, decision rules, and overall solution. The team directed implementation and reviewed the final work.
+
+**AI coding tools used.** Claude and OpenAI Codex were used as coding assistants to speed up implementation, debugging, and documentation. They supported the team’s work; they did not independently create the project or make its design decisions.
+
+**External code, libraries, templates, and data.**
+
+- The Python decision engine uses the Python standard library.
+- The web interface uses React, Vite, and Recharts.
+- UI design references and templates informed the visual direction; the team adapted the design for this project.
+- No external datasets were added; the solution uses the data supplied for the competition.
 ## Additional commands
 
 Reproduce the scored output and run the test suite:
