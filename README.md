@@ -4,7 +4,7 @@
 `ACCEPT`, `COUNTER <price>`, `REJECT` or `ESCALATE`, gives the reason, and records *why* in a step-by-step
 audit trail. Submission for **Data Sprint 2.0 (Anveshan NIE)**.
 
-| | |
+| Project fact | Result |
 |---|---|
 | Final label source | `python -m procurement_desk generate` (deterministic code; no hand labels) |
 | Worked examples (`sample_threads.csv` vs `sample_answers.csv`) | **40 / 40** exact match |
@@ -15,11 +15,49 @@ audit trail. Submission for **Data Sprint 2.0 (Anveshan NIE)**.
 
 > **Reproducibility:** `python -m procurement_desk generate --root .` regenerates the submitted CSV, and
 > `python -m unittest tests.test_golden` asserts that all 2,000 labels are identical to the file that scored
-> 1.00. See [11. How to run](#11-how-to-run).
+> 1.00. See [Run locally](#run-locally).
+
+## Run locally
+
+**Deployment link:** _Add the deployed prototype URL here._
+
+**Requirements:** [uv](https://docs.astral.sh/uv/getting-started/installation/) and Python 3.11+. Node.js 18+
+is needed only to rebuild the web UI. Clone the repository, then run these commands from its root:
+
+```powershell
+git clone https://github.com/BinduYajman/Procurement_Desk_Agent.git
+cd Procurement_Desk_Agent
+uv sync --locked
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.venv\Scripts\Activate.ps1
+python -m procurement_desk validate-playbook --root dataset
+python -m procurement_desk evaluate --root dataset
+```
+
+To open the local web demo, build its UI once and start the server:
+
+```powershell
+npm --prefix ui/web ci
+npm --prefix ui/web run build
+python ui/server.py --root dataset
+```
+
+Then open <http://127.0.0.1:8000>. The PowerShell execution-policy command applies only to the current
+terminal session. On macOS/Linux, activate the environment with `source .venv/bin/activate`. You can skip
+activation and run Python commands with `uv run`, for example
+`uv run python ui/server.py --root dataset`.
+
+To generate the submission CSV:
+
+```powershell
+python -m procurement_desk generate --root dataset --input dataset/threads.csv --output outputs/submission.csv --strict
+```
+
+The repository includes the demo `dataset/` folder with `threads.csv`, sample files and the playbook.
 
 ## Contents
 
-0. [Problem, solution, methodology, technologies](#0-problem-solution-methodology-technologies)
+0. [Problem, solution, methodology](#0-problem-solution-methodology)
 1. [Overview: how the agent reads a thread and decides](#1-overview-how-the-agent-reads-a-thread-and-decides)
 2. [Mathematics](#2-mathematics)
 3. [Architecture](#3-architecture)
@@ -29,21 +67,20 @@ audit trail. Submission for **Data Sprint 2.0 (Anveshan NIE)**.
 7. [Evaluation](#7-evaluation)
 8. [Real-world application](#8-real-world-application)
 9. [Drawbacks and limitations](#9-drawbacks-and-limitations)
-10. [Original work and disclosures](#10-original-work-and-disclosures)
-11. [How to run](#11-how-to-run)
+[Additional commands](#additional-commands)
 
 | Judging criterion | Where to look |
 |---|---|
-| Problem understanding | §0, §1, §6 |
-| Innovation and creativity | §3 (decision is code, not a model; evidence-guarded extractor interface), §6 |
-| Technical implementation | §2, §4, §5 |
-| Functionality and accuracy | §7 |
-| Practical applicability | §8, §9 |
-| Presentation and demonstration | `explain` command (§11), audit trail (§1), diagrams (§1, §3) |
+| Problem understanding | Sections 0, 1 and 6 |
+| Innovation and creativity | Section 3 (deterministic decision code and evidence-guarded extractor interface), Section 6 |
+| Technical implementation | Sections 2, 4 and 5 |
+| Functionality and accuracy | Section 7 |
+| Practical applicability | Sections 8 and 9 |
+| Presentation and demonstration | `explain` command (Run locally), audit trail (Section 1), diagrams (Sections 1 and 3) |
 
 ---
 
-## 0. Problem, solution, methodology, technologies
+## 0. Problem, solution, methodology
 
 **Problem.** Acme negotiates with 40 suppliers across 15 categories. Each supplier reply (a free-text email
 thread) must become exactly one decision that follows a written playbook: a concession schedule per category,
@@ -64,10 +101,6 @@ playbook's decision procedure as six ordered rules. Every decision carries an au
 4. Treat all supplier text as untrusted data, and fail safe (escalate to a human) when the text is not understood.
 5. Verify with the 40 worked examples, unit tests per rule and precedent, property-based tests, a golden file of all 2,000 labels, and deliberate-bug (mutation) checks.
 
-**Technologies.** Python 3.11+ standard library only (`fractions`, `re`, `unicodedata`, `csv`, `argparse`,
-`http.server`, `unittest`). No third-party runtime dependency, no network access, no model.
-GitHub Actions for CI (`.github/workflows/ci.yml`).
-
 ---
 
 ## 1. Overview: how the agent reads a thread and decides
@@ -85,9 +118,9 @@ For each row of `threads.csv` (`thread_id, date, supplier, category, quantity, r
    (cue phrases such as "we can do", "we are pleased to quote", "our final price is", or a `CORRECTION` line).
    Lines flagged as injections are skipped, so injected text can never supply a price. Earlier supplier
    quotes are collected separately, for "% off our previous quote".
-6. **Normalize** the offer to *p*: INR, excluding GST, per the category's unit (§2.2).
+6. **Normalize** the offer to *p*: INR, excluding GST, per the category's unit (Section 2.2).
 7. **Resolve the numbers in force** for this thread: category page, then amendments effective on or before
-   the thread date, then the supplier's contract cap (§2.1).
+   the thread date, then the supplier's contract cap (Section 2.1).
 8. **Apply the decision procedure** (first rule that fires wins):
 
 ```mermaid
@@ -203,20 +236,17 @@ $L(2) = 62000 + 8000\,(1/3)^2 = 62888.\overline{8}$.
 
 ### 2.4 Price decision and counter rounding
 
-$$
-\text{decision}=\begin{cases}
-\text{pass to the approval check} & p \le L(r)\\
-\text{REJECT: ABOVE\_WALKAWAY} & p > L(r) \text{ and } r \ge R\\
-\text{COUNTER at } \lfloor L(r) + \tfrac12 \rfloor & p > L(r) \text{ and } r < R
-\end{cases}
-$$
+If `p <= L(r)`, continue to the approval check. If `p > L(r)` and `r >= R`, the result is
+`REJECT:ABOVE_WALKAWAY`. Otherwise, counter at `L(r)` rounded to the nearest rupee.
 
 The counter is the exact value *L(r)* rounded to the nearest rupee, with x.5 rounding up
 (`Decimal` `ROUND_HALF_UP` applied to the exact fraction). For the example above, ⌊62,888.89 + ½⌋ = **62,889**.
 
 ### 2.5 Approval limit
 
-$$V = p \cdot q \quad (\text{one billing period for subscriptions}); \qquad V \le A \Rightarrow \text{ACCEPT},\quad V > A \Rightarrow \text{ESCALATE: OVER\_APPROVAL\_LIMIT}$$
+$$V = p \cdot q \quad (\text{one billing period for subscriptions})$$
+
+If `V <= A`, the result is `ACCEPT`; if `V > A`, the result is `ESCALATE:OVER_APPROVAL_LIMIT`.
 
 ### 2.6 Advance-payment rule (`contract_terms.advance_share`)
 
@@ -230,13 +260,11 @@ advance share *s*. The clause is a banned term iff $s > 30$ (exactly 30 is allow
 |---|---|---|
 | `T10033` Kestrel Learning, security guards, round 1 | EUR 285.98 × 90.5 (supplier **contract** rate, not the table's 91) = 25,881.19 vs *L*(1) = *T* = 21,000 | `COUNTER:COUNTER_OFFER:21000` |
 | `T10047` Jupiter Devices, courier, round 4 (final) | `CORRECTION … should read ₹236 per shipment, not Rs. 271` → p = 236. Walk-away 210 comes from amendment AMD-01 (effective 2026-09-22 ≤ 2026-10-07) | `REJECT:ABOVE_WALKAWAY:` |
-| `T10008` (§1) | 80,360 × 5/6 = 66,966.67 vs *L*(2) = 62,888.89 | `COUNTER:COUNTER_OFFER:62889` |
+| `T10008` (Section 1) | 80,360 × 5/6 = 66,966.67 vs *L*(2) = 62,888.89 | `COUNTER:COUNTER_OFFER:62889` |
 
 ---
 
 ## 3. Architecture
-
-![Architecture](docs/architecture.png)
 
 ```mermaid
 flowchart TB
@@ -271,6 +299,8 @@ flowchart TB
     AUD --> O3["Escalation tickets"]
     EXT -. "optional fallback hook (not used)" .-> LLM["Other extractor, e.g. an LLM<br/>evidence must quote the message verbatim"]
 ```
+
+![Architecture](docs/architecture.png)
 
 **Design decisions.**
 
@@ -312,7 +342,7 @@ docs/                ARCHITECTURE.md, architecture.png
 | `PromptInjectionDetector.scan` | Canonicalizes text (NFKC, invisible characters, look-alike letters), masks the benign wording the policy allows, matches the rule lexicon per line and across line breaks |
 | `BannedTermDetector.scan` | Clause-level detection of the four banned terms, with negation handling ("no automatic renewal", "exclusive of GST") |
 | `RuleBasedExtractor.extract` | Finds current-offer lines and earlier-quote lines; records amounts and conditions as `OfferEvidence`, no arithmetic |
-| `normalize` | N1–N9 of §2.2, returning the price and a list of trace steps |
+| `normalize` | N1–N9 of Section 2.2, returning the price and a list of trace steps |
 | `Playbook.values_for` | Numbers in force with provenance (which page/amendment/contract set each) |
 | `PolicyEngine.run` | Runs R1–R6 in order, first match wins, records every rule checked |
 | `DecisionPipeline.decide` | Orchestrates the stages; never raises in normal mode (escalates with a flag instead) |
@@ -348,7 +378,7 @@ history (before the v1.0.0 rewrite). From that code:
 | Quota handling | Batched threads per request "to fit constrained API quotas"; a minimum interval between requests (default 4.2 s, `GEMINI_MIN_REQUEST_INTERVAL_SECONDS`); up to 3 attempts with backoff on 408/429/5xx; 90 s timeout |
 | Call count and cost | The repository did not log per-run call counts or spend, so none are claimed here |
 
-Why the model was removed: see §7.
+Why the model was removed: see Section 7.
 
 ---
 
@@ -360,11 +390,11 @@ Why the model was removed: see §7.
 | **Banned terms** | Automatic renewal in any wording, advance above 30% (numbers or words), unlimited liability for Acme, exclusivity; allowed: renewal by mutual agreement, ≤ 30% advance, net terms, "no exclusivity asked"; only in the *latest* message | `contract_terms.py`: clause-level patterns with negation handling; "continues year to year" (P-07) counts as renewal; "exclusive of GST" is not exclusivity; the advance percentage nearest to the keyword is used; earlier messages are not scanned |
 | **Amendments** | Apply amendments effective on/before the thread date; later replaces earlier | `Playbook.values_for` applies them chronologically. Two LED amendments overlap (AMD-08 effective 12-04, AMD-07 effective 12-05): a thread on 2026-12-04 uses walk-away 2,330, on 2026-12-05 uses 2,360 (tested) |
 | **Supplier contracts** | A contract price cap replaces the walk-away price; a contract rate replaces the table rate | Cap applied after amendments (it overrides them); contract FX used for that supplier and currency only (`T10033` above); both parsed from `suppliers/*.md` |
-| **Trading names / supplier identity** | The playbook defines no aliases or trading names | Suppliers are looked up by the `supplier` column, case-insensitively. In this dataset all 2,000 values match a playbook supplier exactly and no message names a different supplier. A name not in the playbook is treated as approved and flagged `UNKNOWN_SUPPLIER`. **No fuzzy or alias matching is implemented (see §9)** |
+| **Trading names / supplier identity** | The playbook defines no aliases or trading names | Suppliers are looked up by the `supplier` column, case-insensitively. In this dataset all 2,000 values match a playbook supplier exactly and no message names a different supplier. A name not in the playbook is treated as approved and flagged `UNKNOWN_SUPPLIER`. **No fuzzy or alias matching is implemented (see Section 9)** |
 | **Currencies** | USD/EUR/GBP table rates; other currency = missing information | `$ € £ ¥` and ISO codes from a built-in list are recognised (`$` is read as USD). JPY, SGD, AED, CHF… → `ESCALATE:MISSING_INFO` (32 threads) |
 | **Corrections** | A correction replaces the price it corrects | A `CORRECTION` line's amount after "should read" is used; "not ₹X" is ignored (`T10047`) |
 | **Multi-price messages** | Only the latest offer counts; ranges, tiers, volume discounts, free units | "Our earlier quote was …" in the latest message is not an offer; ranges → higher end; tiers → by quantity; volume discount only if the threshold is met; "% off our previous quote" → applied to the supplier's own previous quote; if a message has several offer lines, the first usable one is used and `MULTIPLE_PRICE_LINES` is flagged (never occurs in the competition data) |
-| **Units and GST** | Dozens, packs, reams, totals, lakh/k, words, GST-inclusive | N3–N7 of §2.2, plus `per 100 fixtures` style quotes |
+| **Units and GST** | Dozens, packs, reams, totals, lakh/k, words, GST-inclusive | N3–N7 of Section 2.2, plus `per 100 fixtures` style quotes |
 | **Billing period** | Monthly ↔ yearly ×/÷ 12; a subscription price without a period is missing | N8; 5 threads are missing a period |
 | **Probation** | No concessions: *L(r) = T* every round | `PriceDecision` rule |
 | **Precedence** | Missing info → blacklist → injection → banned term → price → approval | `PolicyEngine`; a blacklisted supplier with an injection is `REJECT`, a thread with no price is `MISSING_INFO` before either |
@@ -450,96 +480,28 @@ is traceable to a playbook clause.
 
 ---
 
-## 10. Original work and disclosures
+## Additional commands
 
-**What the team built.** The problem analysis, the approach, the first LLM-assisted pipeline (v0.1.0: Gemini
-extraction, LangGraph orchestration, deterministic policy engine, preserved in Git history), the submissions, and the iteration between versions.
+Reproduce the scored output and run the test suite:
 
-**AI coding tools used.** The v1.0.0 code in this repository (the rule-based extractor, security and
-banned-term detectors, normalization, policy engine, pipeline, CLI, HTTP service), the test suite, this README and
-`docs/ARCHITECTURE.md` were written with substantial assistance from **Claude (Anthropic's AI assistant)**, under
-the team's direction. Claude was also used to review the v0.1.0 code and to find the defects listed in §7. The
-final labels are produced by running this repository's code; **no label was written by hand.**
-
-**External code, libraries and data.**
-
-- v1.0.0 uses only the Python standard library; there are no third-party runtime dependencies, templates or copied code.
-- v0.1.0 (Git history) used `google-genai` (Gemini API), `pydantic`, `langgraph` and `pandas`.
-- The playbook, `threads.csv`, `sample_threads.csv`, `sample_answers.csv` and `sample_submission.csv` come from the organisers. The 40 sample answers are used only by the `evaluate` command and the tests; **no rule refers to a thread ID or to a sample answer.**
-- `tests/golden/submission_scored_1.0.csv` is our own earlier output, kept as a regression baseline.
-- Mermaid (diagrams on GitHub) and GitHub Actions (CI) are standard tooling.
-- No code was shared with or received from another team.
-
----
-
-## 11. How to run
-
-**Requirements:** Python 3.11 or newer (developed and tested on 3.12). No `pip install` is needed.
-
-**1. Get the code and the data.**
-
-```bash
-git clone https://github.com/BinduYajman/Procurement_Desk_Agent.git
-cd Procurement_Desk_Agent
-```
-
-Place the organisers' files in a `dataset/` folder (skip if it is already there):
-
-```
-dataset/
-  threads.csv   sample_threads.csv   sample_answers.csv   sample_submission.csv
-  playbook/playbook/{categories,suppliers,amendments,policies,precedents}/...
-```
-
-(Any other location works with `--root <folder>`; the folder must contain `threads.csv` and the playbook.)
-
-**2. Validate the playbook and check the worked examples.**
-
-```bash
-python -m procurement_desk validate-playbook --root .
-# Loaded 15 categories, 40 suppliers, 9 amendments, 8 precedents (fingerprint d0a0e75a98cfe3ec).
-python -m procurement_desk evaluate --root .
-# Exact match: 40/40 = 100.00%
-```
-
-**3. Generate the submission.**
-
-```bash
-python -m procurement_desk generate --root . --input threads.csv --output outputs/submission.csv --strict
-```
-
-This writes `outputs/submission.csv` (`thread_id,label`, 2,000 rows), `outputs/audit.jsonl` (one audit record per thread) and `outputs/escalations.jsonl` (review tickets), and prints the label counts shown in §7.
-
-**4. Confirm it reproduces the submission that scored 1.00** (works on Windows, macOS and Linux):
-
-```bash
+```powershell
 python -m unittest tests.test_golden -v
-# 3 tests, OK   (sample answers, all 2,000 labels identical to the golden file, no advisory flags)
-```
-
-or compare the files directly: `python -c "import filecmp; print(filecmp.cmp('outputs/submission.csv','tests/golden/submission_scored_1.0.csv',shallow=False))"` prints `True`.
-
-**5. Run the whole test suite.**
-
-```bash
 python -m unittest discover -s tests -t .
-# Ran 64 tests ... OK
 ```
 
-**6. See how one thread was decided (good for a demo).**
+See the decision trace for a thread:
 
-```bash
-python -m procurement_desk explain T10008 --root . --show-message
+```powershell
+python -m procurement_desk explain T10008 --root dataset --show-message
 ```
 
-**7. Optional: HTTP service.**
+Optional HTTP API:
 
-```bash
-python -m procurement_desk serve --root . --port 8080
+```powershell
+python -m procurement_desk serve --root dataset --port 8080
 curl http://127.0.0.1:8080/healthz
 ```
 
-`POST /v1/decisions` takes one thread as JSON (the CSV's column names) and returns the decision and its full audit record.
-
-Exit codes: `0` success, `1` a check failed (for example a mismatch in `evaluate`), `2` an error. `--strict` makes
-`generate` stop on any bad row or internal error instead of escalating it.
+`POST /v1/decisions` takes one thread as JSON (the CSV column names) and returns the decision and its full audit
+record. Exit codes: `0` success, `1` a check failed (for example a mismatch in `evaluate`), `2` an error.
+`--strict` makes `generate` stop on any bad row or internal error instead of escalating it.
