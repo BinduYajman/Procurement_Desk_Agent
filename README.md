@@ -8,8 +8,7 @@ audit trail. Submission for **Data Sprint 2.0 (Anveshan NIE)**.
 |---|---|
 | Final label source | `python -m procurement_desk generate` (deterministic code; no hand labels) |
 | Worked examples (`sample_threads.csv` vs `sample_answers.csv`) | **40 / 40** exact match |
-| Public leaderboard (about 31% of the test data) | **1.00** (earlier LLM-assisted version: 0.96737) |
-| LLM / API calls in the final pipeline | **0** (standard-library Python only) |
+| Public leaderboard (about 31% of the test data) | **1.00**  |
 | Tests | 64 (unit, property-based, golden-file, HTTP), plus 16 deliberate-bug checks |
 | Speed | 2,000 threads in about 1.5 s on one core |
 
@@ -69,14 +68,6 @@ The repository includes the demo `dataset/` folder with `threads.csv`, sample fi
 9. [Drawbacks and limitations](#9-drawbacks-and-limitations)
 [Additional commands](#additional-commands)
 
-| Judging criterion | Where to look |
-|---|---|
-| Problem understanding | Sections 0, 1 and 6 |
-| Innovation and creativity | Section 3 (deterministic decision code and evidence-guarded extractor interface), Section 6 |
-| Technical implementation | Sections 2, 4 and 5 |
-| Functionality and accuracy | Section 7 |
-| Practical applicability | Sections 8 and 9 |
-| Presentation and demonstration | `explain` command (Run locally), audit trail (Section 1), diagrams (Sections 1 and 3) |
 
 ---
 
@@ -153,8 +144,7 @@ For the 20 laptops you requested, we can do INR 80,360 per laptop, plus 1 free l
 Our system integration team will handle setup at no extra cost.
 ```
 
-`python -m procurement_desk explain T10008 --root .` prints the real trail (abridged here):
-
+`python -m procurement_desk explain T10008 --root .` prints the real trail 
 ```
 T10008  Northstar Facilities / laptops  qty 20  round 2  date 2026-09-21
 DECISION  COUNTER:COUNTER_OFFER:62889   (rule R5)
@@ -347,7 +337,7 @@ docs/                ARCHITECTURE.md, architecture.png
 | `PolicyEngine.run` | Runs R1–R6 in order, first match wins, records every rule checked |
 | `DecisionPipeline.decide` | Orchestrates the stages; never raises in normal mode (escalates with a flag instead) |
 
-**LLM vs rule-based.**
+
 
 | Component | Technique |
 |---|---|
@@ -355,8 +345,6 @@ docs/                ARCHITECTURE.md, architecture.png
 | Offer extraction | Rule-based (`RuleBasedExtractor`) |
 | Normalization, concession schedule, rounding, approval limit | Exact arithmetic |
 | Decision, audit record, escalation ticket | Deterministic code |
-| **Anything using an LLM in the final pipeline** | **None.** `ExtractorChain` is an extension point for a future LLM extractor (its evidence must quote the message verbatim, pass through the same normalization and policy, and can never override a security finding); no LLM extractor is shipped or used. |
-
 ---
 
 ## 5. AI models and APIs
@@ -419,9 +407,6 @@ Command: `python -m procurement_desk evaluate --root .`.
 | `REJECT:BLACKLISTED_SUPPLIER` | 105 |
 | `ESCALATE:MISSING_INFO` | 92 (55 no price in the message, 32 unsupported currency, 5 subscription price without a period) |
 
-**Leaderboard.** v0.1.0 (Gemini extraction + deterministic policy): best **0.96737** over two submissions.
-v1.0.0 (rule-based extraction + the same policy): **1.00** on the public leaderboard (about 31% of the test
-data). The final ranking uses the remaining ~69%; the same file covers all 2,000 threads. We cannot see the hidden labels, so we do not claim 100% on the unseen portion.
 
 **Error analysis: what changed between submissions.** The leaderboard does not expose per-row results, so we
 cannot name the exact rows that cost the 3.3% in v0.1.0. Instead we tested the legacy modules directly and
@@ -454,7 +439,7 @@ is traceable to a playbook clause.
 
 **What is already production-minded.** Stateless pipeline (scales horizontally; about 1,300–1,600 threads/s per core in our environment); the playbook is configuration, not code, with a validator and a fingerprint stored in every audit record (a decision can be reproduced later); an audit record per decision; fail-safe escalation; an HTTP service (`GET /healthz`, `POST /v1/decisions`, `POST /v1/decisions:batch`); no dependency or network need; CI.
 
-**What a real deployment still needs (not built here).**
+**What a real deployment still needs?.**
 
 - *Ingestion:* connect to the mailbox or portal, split replies into the thread format, and **verify sender identity** (SPF/DKIM, mapping addresses to suppliers, aliases and trading names).
 - *Access and safety:* authentication and authorization on the service, rate limiting, input size limits (the service caps body size), and persistent, tamper-evident audit storage with retention rules.
