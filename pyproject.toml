@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "procurement-desk"
+version = "1.0.0"
+description = "Deterministic, auditable procurement negotiation decision engine"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []          # standard library only
+
+[project.scripts]
+procurement-desk = "procurement_desk.cli:main"
+
+[tool.setuptools]
+packages = ["procurement_desk"]

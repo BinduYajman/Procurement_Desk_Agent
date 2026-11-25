@@ -1,0 +1,22 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    env:
+      PROCUREMENT_ROOT: dataset        # folder holding playbook/, threads.csv, sample_*.csv
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m unittest discover -s tests -t . -v
+      - run: python -m procurement_desk validate-playbook --root dataset
+      - run: python -m procurement_desk evaluate --root dataset
+      - name: Regenerate the submission and diff it against the scored golden file
+        run: |
+          python -m procurement_desk generate --root dataset --output outputs/submission.csv --strict
+          diff outputs/submission.csv tests/golden/submission_scored_1.0.csv
